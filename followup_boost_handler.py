@@ -31,14 +31,14 @@ class ProactiveFollowupBoostHandler(BaseEventHandler):
     # 进程内简单缓存：按 stream_id 记录最近一次主动发送时间
     _last_proactive_sent_at: dict[str, float] = {}
 
-    async def execute(self, message: MaiMessages) -> Tuple[bool, bool, Optional[str]]:
+    async def execute(self, message: MaiMessages) -> Tuple[bool, bool, Optional[str],Optional[CustomEventHandlerResult], Optional[MaiMessages]]:
         try:
             if not self.plugin_config:
-                return True, True, None
+                return True, True, None, None, None
 
             conf = self.plugin_config.get("followup_boost", {})
             if not conf.get("enabled", True):
-                return True, True, None
+                return True, True, None, None, None
 
             window_seconds = int(conf.get("window_seconds", 300))
             willing_value = float(conf.get("willing_value", 0.85))
@@ -60,10 +60,10 @@ class ProactiveFollowupBoostHandler(BaseEventHandler):
                 sent_at = self._last_proactive_sent_at.get(stream_id)
 
             if not sent_at:
-                return True, True, None
+                return True, True, None, None, None
 
             if now - sent_at > window_seconds:
-                return True, True, None
+                return True, True, None, None, None
 
             # 在窗口内：提升会话意愿与概率
             gain = max(0.0, min(1.0, willing_value))  # 保护边界
@@ -87,10 +87,10 @@ class ProactiveFollowupBoostHandler(BaseEventHandler):
                 pass
 
             logger.info(f"[跟进加权] {stream_id} 窗口内加权，设定意愿≈{gain:.2f}")
-            return True, True, None
+            return True, True, None, None, None
         except Exception as e:
             logger.error(f"[跟进加权] 处理异常: {e}")
-            return False, True, str(e)
+            return False, True, str(e), None, None
 
     @classmethod
     def record_proactive_sent(cls, stream_id: str):
