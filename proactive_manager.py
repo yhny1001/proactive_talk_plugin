@@ -1086,31 +1086,29 @@ class ProactiveManager:
             target_type, target_id = target.split(":", 1)
             logger.info(f"[真实发送] 准备发送到 {target_type}:{target_id} - {content}")
             
-            # 导入发送API
-            from src.plugin_system.apis import send_api
-            
-            success = False
+            # 获取聊天流ID
+            from src.chat.message_receive.chat_stream import get_chat_manager
+            stream_id = None
             if target_type == "private":
-                # 私聊发送
-                user_stream_id = chat_api.get_stream_by_user_id(user_id=str(target_id), platform="qq").stream_id
-                success = await send_api.text_to_stream(
-                    text=content,
-                    stream_id=user_stream_id,
-                    typing=True,    # 显示输入状态
-                    storage_message=True  # 存储消息记录
-                )
+                stream_id = get_chat_manager().get_stream_id("qq", target_id, is_group=False)
             elif target_type == "group":
-                # 群聊发送  
-                group_stream_id = chat_api.get_stream_by_group_id(group_id=str(target_id), platform="qq").stream_id
-                success = await send_api.text_to_stream(
-                    text=content,
-                    stream_id=group_stream_id,
-                    typing=True,
-                    storage_message=True
-                )
+                stream_id = get_chat_manager().get_stream_id("qq", target_id, is_group=True)
             else:
                 logger.error(f"[真实发送] 不支持的目标类型: {target_type}")
                 return False
+            
+            if not stream_id:
+                logger.error(f"[真实发送] 无法获取流ID: {target}")
+                return False
+            
+            # 导入发送API
+            from src.plugin_system.apis import send_api
+            success = await send_api.text_to_stream(
+                content,
+                stream_id,
+                typing=True,
+                storage_message=True
+            )
             
             if success:
                 logger.info(f"[真实发送] ✅ 成功向 {target} 发送: {content[:50]}...")
